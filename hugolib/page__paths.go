@@ -18,6 +18,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/gohugoio/hugo/common/paths"
 	"github.com/gohugoio/hugo/output"
 
 	"github.com/gohugoio/hugo/resources/kinds"
@@ -97,6 +98,39 @@ func newPagePaths(ps *pageState) (pagePaths, error) {
 	}, nil
 }
 
+// targetPathDir returns the directory part of p's target path, with any
+// slug set in the section, taxonomy or term pages above it applied.
+func targetPathDir(p *pageState, pi *paths.Path) string {
+	unnormalized := p.s.Conf.DisablePathToLower()
+	base := func(pg page.Page) string {
+		pi := pg.PathInfo()
+		if unnormalized {
+			pi = pi.Unnormalized()
+		}
+		return pi.Base()
+	}
+
+	var branchDir func(pg page.Page) string
+	branchDir = func(pg page.Page) string {
+		if pg.IsHome() {
+			return ""
+		}
+		parent := pg.Parent()
+		rel := strings.TrimPrefix(base(pg), base(parent))
+		if slug := pg.Slug(); slug != "" {
+			rel = path.Join(path.Dir(rel), slug)
+		}
+		return branchDir(parent) + rel
+	}
+
+	if kinds.IsBranch(p.Kind()) {
+		return branchDir(p)
+	}
+
+	section := p.CurrentSection()
+	return branchDir(section) + strings.TrimPrefix(pi.ContainerDir(), base(section))
+}
+
 type pagePaths struct {
 	outputFormats     page.OutputFormats
 	firstOutputFormat page.OutputFormat
@@ -115,18 +149,15 @@ func createTargetPathDescriptor(p *pageState) (page.TargetPathDescriptor, error)
 	pm := p.m
 	alwaysInSubDir := p.Kind() == kinds.KindSitemap
 	pageInfoPage := p.PathInfo()
-
-	pageInfoCurrentSection := p.CurrentSection().PathInfo()
 	if p.s.Conf.DisablePathToLower() {
 		pageInfoPage = pageInfoPage.Unnormalized()
-		pageInfoCurrentSection = pageInfoCurrentSection.Unnormalized()
 	}
 
 	desc := page.TargetPathDescriptor{
 		PathSpec:    d.PathSpec,
 		Kind:        p.Kind(),
 		Path:        pageInfoPage,
-		Section:     pageInfoCurrentSection,
+		Dir:         targetPathDir(p, pageInfoPage),
 		UglyURLs:    s.h.Conf.IsUglyURLs(p.Section()),
 		ForcePrefix: s.h.Conf.IsMultihost() || alwaysInSubDir,
 		URL:         pm.pageConfig.URL,
@@ -201,7 +232,7 @@ func createTargetPathDescriptor(p *pageState) (page.TargetPathDescriptor, error)
 		if p.File() != nil {
 			s.Log.Debugf("Set expanded permalink path for %s %s to %#v", p.Kind(), p.File().Path(), opath)
 		} else {
-			s.Log.Debugf("Set expanded permalink path for %s in %v to %#v", p.Kind(), desc.Section.Path(), opath)
+			s.Log.Debugf("Set expanded permalink path for %s %s to %#v", p.Kind(), p.Path(), opath)
 		}
 	}
 
