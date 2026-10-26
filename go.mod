@@ -58,7 +58,7 @@ require (
 	github.com/tdewolff/parse/v2 v2.6.0
 	github.com/yuin/goldmark v1.4.12
 	go.uber.org/atomic v1.9.0
-	gocloud.dev v0.24.0
+	gocloud.dev v0.42.0
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
 	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
